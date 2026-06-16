@@ -116,7 +116,7 @@ def decide_and_submit(
     Apply safety rules, choose the review event, and submit it to GitHub.
     """
     # ------------------------------------------------------------------
-    # Guard: LLM parse failure → safe comment, no formal review
+    # Guard: LLM parse failure -> safe comment, no formal review
     # ------------------------------------------------------------------
     if llm_result.parse_error:
         log.warning("LLM parse error detected: %s", llm_result.parse_error)
@@ -153,7 +153,7 @@ def decide_and_submit(
 
     # Hard override: if any check failed, we cannot approve.
     if not checks_ok and final_event == "APPROVE":
-        log.warning("Downgrading APPROVE → REQUEST_CHANGES because checks failed.")
+        log.warning("Downgrading APPROVE -> REQUEST_CHANGES because checks failed.")
         final_event = "REQUEST_CHANGES"
 
     log.info("Final review event: %s", final_event)

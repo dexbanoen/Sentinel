@@ -98,7 +98,9 @@ class GitHubClient:
         )
         try:
             pr = self._repo.get_pull(pr_number)
-            pr.create_review(commit_id=head_sha, body=body, event=event)
+            # PyGithub 2.x: create_review() takes a Commit object, not a raw SHA string
+            commit = self._repo.get_commit(head_sha)
+            pr.create_review(commit=commit, body=body, event=event)
             log.info("Review submitted successfully.")
         except GithubException as exc:
             log.error("Failed to submit review: %s", exc)

@@ -91,10 +91,11 @@ def _run(cmd: List[str], name: str, timeout: int = 120) -> CheckResult:
 # ---------------------------------------------------------------------------
 
 def _check_tests() -> CheckResult:
-    """Try pytest first, then npm test."""
+    """Try pytest first, then npm test (only if package.json exists)."""
+    import os
     if shutil.which("pytest"):
         return _run(["pytest", "--tb=short", "-q"], name="tests")
-    if shutil.which("npm"):
+    if shutil.which("npm") and os.path.exists("package.json"):
         return _run(["npm", "test", "--if-present"], name="tests")
     return CheckResult(
         name="tests",
@@ -148,5 +149,5 @@ def run_checks() -> List[CheckResult]:
         _check_typecheck(),
     ]
     for c in checks:
-        log.info("  %-12s → %s", c.name, c.status.value.upper())
+        log.info("  %-12s -> %s", c.name, c.status.value.upper())
     return checks
