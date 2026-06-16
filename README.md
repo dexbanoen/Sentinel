@@ -6,7 +6,7 @@
 
 ---
 
-## How it works
+## How it works!!!
 
 ```
 PR opened / updated
