@@ -1,23 +1,20 @@
 """
-checks.py — Run basic quality checks on the repository if the tools exist.
+checks.py - Runs basic quality checks against the repository.
 
 Checks attempted (in order):
-  1. Tests   — pytest, or npm test, depending on what's found.
-  2. Lint    — ruff, flake8, or eslint.
-  3. Typecheck — mypy or tsc.
+  1. Tests      - pytest, or npm test (only if package.json exists)
+  2. Lint       - ruff, flake8, or eslint
+  3. Typecheck  - mypy or tsc
 
-Each check is attempted; if the tool is not installed it is recorded as
-SKIPPED rather than FAILED so that repos without that tooling are not
-penalised.
-
-Returns a list of CheckResult dataclass instances that downstream
-components can inspect.
+Each check gracefully skips if the required tool is not installed,
+so repos without that tooling are not penalised with a FAILED status.
 """
 
 import logging
+import os
 import shutil
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import List
 
@@ -25,53 +22,65 @@ log = logging.getLogger("agent.checks")
 
 
 class CheckStatus(str, Enum):
-    PASSED = "passed"
-    FAILED = "failed"
+    PASSED  = "passed"
+    FAILED  = "failed"
     SKIPPED = "skipped"
 
 
 @dataclass
 class CheckResult:
-    name: str
-    status: CheckStatus
-    output: str = ""
+    """Result of a single quality check."""
+    name:        str
+    status:      CheckStatus
+    output:      str = ""
     return_code: int = 0
 
 
 def _run(cmd: List[str], name: str, timeout: int = 120) -> CheckResult:
-    """Run a shell command and return a CheckResult."""
-    tool = cmd[0]
-    if not shutil.which(tool):
-        log.info("Check [%s]: tool '%s' not found — SKIPPED.", name, tool)
-        return CheckResult(name=name, status=CheckStatus.SKIPPED, output=f"Tool '{tool}' not found.")
+    """
+    Resolve the tool path and run the command as a subprocess.
 
-    log.info("Check [%s]: running %s ...", name, " ".join(cmd))
+    Uses shutil.which() to find the full executable path before calling
+    subprocess.run(). On Windows this is required because tools like npm
+    are batch files (npm.cmd) — passing the bare name causes WinError 2.
+    """
+    tool      = cmd[0]
+    tool_path = shutil.which(tool)
+
+    if not tool_path:
+        log.info("Check [%s]: '%s' not installed - SKIPPED.", name, tool)
+        return CheckResult(
+            name=name,
+            status=CheckStatus.SKIPPED,
+            output=f"Tool '{tool}' not found on PATH.",
+        )
+
+    full_cmd = [tool_path] + cmd[1:]
+    log.info("Check [%s]: running %s", name, " ".join(full_cmd))
+
     try:
         result = subprocess.run(
-            cmd,
+            full_cmd,
             capture_output=True,
             text=True,
             timeout=timeout,
         )
         combined = (result.stdout + "\n" + result.stderr).strip()
-        status = CheckStatus.PASSED if result.returncode == 0 else CheckStatus.FAILED
-        log.info(
-            "Check [%s]: %s (exit code %d).",
-            name,
-            status.value.upper(),
-            result.returncode,
-        )
-        if combined:
-            # Truncate very long outputs so they don't swamp the LLM prompt.
-            if len(combined) > 3000:
-                combined = combined[:3000] + "\n... [output truncated]"
-            log.debug("Check [%s] output:\n%s", name, combined)
+        status   = CheckStatus.PASSED if result.returncode == 0 else CheckStatus.FAILED
+
+        log.info("Check [%s]: %s (exit code %d).", name, status.value.upper(), result.returncode)
+
+        # Truncate very long output so it does not flood the LLM prompt.
+        if len(combined) > 3000:
+            combined = combined[:3000] + "\n... [output truncated]"
+
         return CheckResult(
             name=name,
             status=status,
             output=combined,
             return_code=result.returncode,
         )
+
     except subprocess.TimeoutExpired:
         log.warning("Check [%s]: timed out after %ds.", name, timeout)
         return CheckResult(
@@ -81,15 +90,13 @@ def _run(cmd: List[str], name: str, timeout: int = 120) -> CheckResult:
         )
 
 
-# ---------------------------------------------------------------------------
-# Individual check functions
-# ---------------------------------------------------------------------------
+# Individual checks --------------------------------------------------------
 
 def _check_tests() -> CheckResult:
-    """Try pytest first, then npm test."""
+    """Run pytest if available, otherwise npm test (requires package.json)."""
     if shutil.which("pytest"):
         return _run(["pytest", "--tb=short", "-q"], name="tests")
-    if shutil.which("npm"):
+    if shutil.which("npm") and os.path.exists("package.json"):
         return _run(["npm", "test", "--if-present"], name="tests")
     return CheckResult(
         name="tests",
@@ -99,7 +106,7 @@ def _check_tests() -> CheckResult:
 
 
 def _check_lint() -> CheckResult:
-    """Try ruff, then flake8, then eslint."""
+    """Run ruff, flake8, or eslint - whichever is installed first."""
     if shutil.which("ruff"):
         return _run(["ruff", "check", "."], name="lint")
     if shutil.which("flake8"):
@@ -114,7 +121,7 @@ def _check_lint() -> CheckResult:
 
 
 def _check_typecheck() -> CheckResult:
-    """Try mypy, then tsc."""
+    """Run mypy or tsc - whichever is installed first."""
     if shutil.which("mypy"):
         return _run(["mypy", ".", "--ignore-missing-imports"], name="typecheck")
     if shutil.which("tsc"):
@@ -126,22 +133,15 @@ def _check_typecheck() -> CheckResult:
     )
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
+# Public API ---------------------------------------------------------------
 
 def run_checks() -> List[CheckResult]:
-    """
-    Run all checks and return the results.
-
-    Checks that are skipped are still included in the list so the LLM
-    knows which tools were not available.
-    """
+    """Run all checks and return results. SKIPPED counts are included."""
     checks = [
         _check_tests(),
         _check_lint(),
         _check_typecheck(),
     ]
     for c in checks:
-        log.info("  %-12s → %s", c.name, c.status.value.upper())
+        log.info("  %-12s %s", c.name, c.status.value.upper())
     return checks

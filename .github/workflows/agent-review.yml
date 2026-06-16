@@ -42,9 +42,15 @@ jobs:
           pip install -r tools/agent_reviewer/requirements.txt
 
       - name: Verify Ollama is reachable
+        shell: powershell
         run: |
-          curl --fail --silent --max-time 5 http://localhost:11434/api/tags \
-            || (echo "ERROR: Ollama is not running on this runner. Start it with: ollama serve" && exit 1)
+          try {
+            $response = Invoke-WebRequest -Uri 'http://localhost:11434/api/tags' -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
+            Write-Host "Ollama is running. Status: $($response.StatusCode)"
+          } catch {
+            Write-Error "ERROR: Ollama is not running on this runner. Start it with: ollama serve"
+            exit 1
+          }
 
       - name: Run Agent PR Reviewer
         env:
@@ -61,5 +67,6 @@ jobs:
           OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL || 'llama3.1' }}
           # Maximum diff size in characters before the agent skips LLM review
           MAX_DIFF_CHARS: ${{ vars.MAX_DIFF_CHARS || '20000' }}
+        shell: powershell
         run: |
           python tools/agent_reviewer/main.py
