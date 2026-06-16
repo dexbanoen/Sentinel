@@ -1,0 +1,65 @@
+name: Agent PR Reviewer
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Prevent concurrent reviews on the same PR
+concurrency:
+  group: agent-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  agent-review:
+    name: Agent LLM Review
+    # Must run on a self-hosted runner that has Ollama available locally
+    runs-on: self-hosted
+
+    # Only run on non-draft PRs (optional: remove if you want draft reviews too)
+    if: github.event.pull_request.draft == false
+
+    permissions:
+      pull-requests: write   # needed to submit PR reviews and comments
+      contents: read         # needed to read repo contents
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch enough history to produce a clean diff
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: tools/agent_reviewer/requirements.txt
+
+      - name: Install agent dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r tools/agent_reviewer/requirements.txt
+
+      - name: Verify Ollama is reachable
+        run: |
+          curl --fail --silent --max-time 5 http://localhost:11434/api/tags \
+            || (echo "ERROR: Ollama is not running on this runner. Start it with: ollama serve" && exit 1)
+
+      - name: Run Agent PR Reviewer
+        env:
+          # GitHub token is automatically provided by Actions
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Repository in "owner/repo" format
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          # PR number
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          # SHA of the head commit — used for pinning the review
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          # Ollama settings (can be overridden via repo/org secrets)
+          OLLAMA_HOST: ${{ vars.OLLAMA_HOST || 'http://localhost:11434' }}
+          OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL || 'codellama:13b' }}
+          # Maximum diff size in characters before the agent skips LLM review
+          MAX_DIFF_CHARS: ${{ vars.MAX_DIFF_CHARS || '20000' }}
+        run: |
+          python tools/agent_reviewer/main.py
