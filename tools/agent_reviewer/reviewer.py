@@ -35,6 +35,15 @@ def _has_blocking_issues(llm_result: LLMReviewResult) -> bool:
     )
 
 
+def _only_minor_issues(llm_result: LLMReviewResult) -> bool:
+    """Return True when every issue is low or info severity (safe to approve)."""
+    minor = {"low", "info"}
+    return all(
+        str(issue.get("severity", "")).lower() in minor
+        for issue in llm_result.issues
+    )
+
+
 def _format_issues_table(issues: list) -> str:
     """Render the LLM issues list as a Markdown table."""
     if not issues:
@@ -124,11 +133,13 @@ def decide_and_submit(
 
     checks_ok = _checks_passed(check_results)
     blocking  = _has_blocking_issues(llm_result)
+    minor_only = _only_minor_issues(llm_result)
 
     log.info(
-        "Decision: checks_ok=%s, llm_blocking=%s, llm_verdict=%r",
+        "Decision: checks_ok=%s, llm_blocking=%s, minor_only=%s, llm_verdict=%r",
         checks_ok,
         blocking,
+        minor_only,
         llm_result.overall_verdict,
     )
 
@@ -139,6 +150,12 @@ def decide_and_submit(
         final_event = "REQUEST_CHANGES"
     else:
         final_event = "COMMENT"
+
+    # If all issues are low/info severity and checks pass, approve even if
+    # the LLM hedged with a "comment" verdict.
+    if final_event == "COMMENT" and checks_ok and minor_only:
+        log.info("All issues are low/info severity — upgrading COMMENT to APPROVE.")
+        final_event = "APPROVE"
 
     # Hard override: a failed check always blocks approval, regardless of verdict.
     if not checks_ok and final_event == "APPROVE":

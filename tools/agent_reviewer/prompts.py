@@ -35,10 +35,11 @@ Severity definitions:
   info     — observation or improvement idea (not blocking)
 
 Verdict definitions:
-  approve          — the code looks good; no critical or high issues
-  comment          — general feedback but no blocking issues
-  request_changes  — one or more critical or high severity issues present
+  approve          — no critical, high, or medium issues (low/info issues are fine to approve)
+  comment          — only low or info issues, but worth noting without blocking
+  request_changes  — one or more critical, high, or medium severity issues present
 
+Important: if the only issues found are low or info severity, use "approve" as your verdict.
 Do not fabricate issues. If the code looks correct, say so and approve.
 """.strip()
 
