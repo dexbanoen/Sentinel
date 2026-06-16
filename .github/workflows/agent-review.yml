@@ -42,7 +42,7 @@ jobs:
           pip install -r tools/agent_reviewer/requirements.txt
 
       - name: Verify Ollama is reachable
-        shell: pwsh
+        shell: powershell
         run: |
           try {
             $response = Invoke-WebRequest -Uri 'http://localhost:11434/api/tags' -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
@@ -67,6 +67,6 @@ jobs:
           OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL || 'llama3.1' }}
           # Maximum diff size in characters before the agent skips LLM review
           MAX_DIFF_CHARS: ${{ vars.MAX_DIFF_CHARS || '20000' }}
-        shell: pwsh
+        shell: powershell
         run: |
           python tools/agent_reviewer/main.py
