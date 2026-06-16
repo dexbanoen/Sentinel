@@ -17,7 +17,7 @@ components can inspect.
 import logging
 import shutil
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import List
 
@@ -41,14 +41,19 @@ class CheckResult:
 def _run(cmd: List[str], name: str, timeout: int = 120) -> CheckResult:
     """Run a shell command and return a CheckResult."""
     tool = cmd[0]
-    if not shutil.which(tool):
+    tool_path = shutil.which(tool)
+    if not tool_path:
         log.info("Check [%s]: tool '%s' not found — SKIPPED.", name, tool)
         return CheckResult(name=name, status=CheckStatus.SKIPPED, output=f"Tool '{tool}' not found.")
 
-    log.info("Check [%s]: running %s ...", name, " ".join(cmd))
+    # Use the full resolved path as the executable.
+    # On Windows, tools like npm are npm.cmd (batch files). subprocess.run
+    # needs the full path with extension — the bare name "npm" causes WinError 2.
+    full_cmd = [tool_path] + cmd[1:]
+    log.info("Check [%s]: running %s ...", name, " ".join(full_cmd))
     try:
         result = subprocess.run(
-            cmd,
+            full_cmd,
             capture_output=True,
             text=True,
             timeout=timeout,
