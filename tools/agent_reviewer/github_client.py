@@ -13,8 +13,7 @@ import logging
 from typing import Optional
 
 import requests
-from github import Auth, Github
-from github.GithubException import GithubException
+from github import Auth, Github, GithubException
 
 log = logging.getLogger("agent.github")
 
