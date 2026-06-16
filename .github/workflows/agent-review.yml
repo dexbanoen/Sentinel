@@ -58,7 +58,7 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           # Ollama settings (can be overridden via repo/org secrets)
           OLLAMA_HOST: ${{ vars.OLLAMA_HOST || 'http://localhost:11434' }}
-          OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL || 'codellama:13b' }}
+          OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL || 'llama3.1' }}
           # Maximum diff size in characters before the agent skips LLM review
           MAX_DIFF_CHARS: ${{ vars.MAX_DIFF_CHARS || '20000' }}
         run: |

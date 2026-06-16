@@ -45,7 +45,7 @@ def main() -> None:
     head_sha = _require_env("PR_HEAD_SHA")
 
     ollama_host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-    ollama_model = os.environ.get("OLLAMA_MODEL", "codellama:13b")
+    ollama_model = os.environ.get("OLLAMA_MODEL", "llama3.1")
     max_diff_chars = int(os.environ.get("MAX_DIFF_CHARS", "20000"))
 
     log.info("=== Agent PR Reviewer starting ===")
