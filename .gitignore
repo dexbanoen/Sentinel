@@ -1,3 +1,7 @@
+# GitHub Actions self-hosted runner
+# The runner binary + config lives inside the repo folder — never commit it
+actions-runner/
+
 # Python
 __pycache__/
 *.pyc
@@ -11,16 +15,24 @@ build/
 venv/
 env/
 
-# Environment
+# Environment / secrets
 .env
 .env.local
+*.env
+
+# Logs
+*.log
+logs/
 
 # Editor
 .vscode/
 .idea/
 *.swp
 *.swo
+*.suo
+*.user
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
